@@ -5,12 +5,10 @@ from tqdm import tqdm
 from getSimilarity import SimilarityConstants, Similarity
 import codecs, json
 import numpy as np
+import os
+from pathlib import Path
 
-#TODO
-#Take picture of blank paper, change getTrainingImage to take this picture as instead of white
-#Change getTextImgForTraining to randomly generate float and place image at that angle
-
-#									                    CONTENTS
+#									    CONTENTS
 # --------------------------------------#--------------------------------------#--------------------------------------
 #   1. getCharList(file) -- opens the file with characters and returns a list of characters from file
 #   2. genCodes(outputfile) -- generates a list of codes and writes to outputfile
@@ -35,15 +33,15 @@ def getCharList(file):
         for line in f:
             charlist.append(line)
 
+    #Remove newline tag
     charlist = [x.strip("\n") for x in charlist]
     return charlist
 
-
-def genCodes(outputfile):
+def genCodes(charList, outputfile, n):
     outputFile = open(outputfile, 'w')
-    charList = getCharList('chars.txt')
 
-    for i in range(10000):
+    #Generate n codes
+    for i in range(n):
         code = ''
         indexOne = random.randrange(len(charList) - 1)
         indexTwo = random.randrange(len(charList) - 1)
@@ -53,10 +51,9 @@ def genCodes(outputfile):
         if (len(code) > 2):
             print("ERROR: STOP LOOP/CODE LENGTH >2")
 
-    outputFile.write(code)
-    outputFile.write("\n")
+        outputFile.write(code)
+        outputFile.write("\n") #For visibility in file
     outputFile.close()
-
 
 def levenshteinDistance(str1, str2):
     data = pd.read_csv("simVals.csv", index_col=0)
@@ -78,30 +75,14 @@ def levenshteinDistance(str1, str2):
                 d[i].insert(j, minimum)
     ldist = d[-1][-1]
     ratio = (lensum - ldist) / lensum
+
     return {'distance': ldist, 'ratio': ratio}
 
 
 def replaceCost(char1, char2, matrix):
     return matrix[char1][char2]
 
-
-def fixCharList(file, output_file):
-    onlyChars = []
-    i = 0
-
-    # Remove unicode codes, only want characters
-    with open(file, 'r') as f:
-        for line in f:
-            if i % 2 == 0:
-                onlyChars.append(line.strip("\n"))
-            i += 1
-
-    with open(output_file, 'w+') as f:
-        for line in onlyChars:
-            f.write(line)
-            f.write('\n')
-
-
+#For finding OCR Visibility Similarity
 def getImg(letter, number):
     W, H = (150, 300)
     arial = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 150)
@@ -115,34 +96,11 @@ def getImg(letter, number):
     newimg.save("textImgs/" + str(number) + letter + ".jpeg")
     return newimg
 
-
+#Specify which type (ORB, KAZE, SSIM) to use when func is called
 def getSimilarity(path1, path2, Similarity):
-    # imgA = cv2.imread(path1)
-    # imgB = cv2.imread(path2)
-    #
-    # imgA = cv2.cvtColor(imgA, cv2.COLOR_BGR2GRAY)
-    # imgB = cv2.cvtColor(imgB, cv2.COLOR_BGR2GRAY)
-    #
-    # comparer = CompareImage(path1, path2)
-    # s = comparer.compare_image()
-    #
-
     return Similarity.getSimilarity(path1, path2)
 
-    # s = measure.compare_ssim(imgA, imgB)
-    # return s
-
-
-def getCharList(file):
-    charlist = []
-    with open(file, 'r') as f:
-        for line in f:
-            charlist.append(line)
-
-    charlist = [x.strip("\n") for x in charlist]
-    return charlist
-
-
+#Generate char similarity matrix
 def genMatrix(file):
     charList = getCharList(file)
     matrixSize = (len(charList), len(charList))
@@ -162,88 +120,58 @@ def genMatrix(file):
     df = pd.DataFrame(data=matrix, index=charList, columns=charList)
     df.to_csv("simVals.csv")
 
-
+#Get all textImgs
 def saveImgs(file):
     charList = getCharList(file)
     for i in tqdm(range(len(charList))):
         getImg(charList[i], i)
 
-
+#
 def getTextImgForTraining(letter, number):
     # print(letter)
     W, H = (170, 170)  # For text image
     arial = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 75)
 
     newimg = Image.new('1', (W, H), 1)
+    newimg = newimg.convert("RGBA")
     draw = ImageDraw.Draw(newimg)
 
     w, h = draw.textsize(letter, font=arial)
 
-    draw.text(((W - w) / 2, (H - h) / 2), letter, font=arial)
-    newimg = newimg.rotate(17.5, expand=1)
 
-    # newimg.save("textImgs/" + str(number) + letter + ".jpeg")
-    newimg.show()
+
+    #Draw Red Text first in order to make background transparent
+    draw.text(((W - w) / 2, (H - h) / 2), letter, font=arial, fill=(255,0,0,255))
+
+    #Rotate the text to add more noise
+    randAngle = random.uniform(-20, 20)
+    newimg = newimg.rotate(randAngle, expand=1)
+
+    data = newimg.getdata()
+    newData = []
+
+    #Make background transparent
+    for item in data:
+        if item[0] == 255 and item[1] == 255 and item[2] == 255:
+            newData.append((255, 255, 255, 0))
+        elif item[0] == 0 and item[1] == 0 and item[2] == 0:
+            newData.append((255, 255, 255, 0))
+        else:
+            newData.append(item)
+
+    newimg.putdata(newData)
+
+    #Make text black
+    imgWithBlackText = []
+    for item in newimg.getdata():
+        if item[0] == 255 and item[1] == 0 and item[2] == 0:
+            imgWithBlackText.append((0,0,0))
+        else:
+            imgWithBlackText.append(item)
+
+    newimg.putdata(imgWithBlackText)
+
     return newimg
-
-
-
-def getTrainingImage(i, trainOrTest, textImg, code):
-    pathToTrainImgs = 'data/train/img/'
-    pathToTrainAnns = 'data/train/ann/'
-
-    pathToTestImgs = 'data/test/img/'
-    pathToTestAnns = 'data/test/ann/'
-
-    arial = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 75)
-    Wimg, Himg = (2560, 1440)
-    textLocation = (random.randint(0, 2261), random.randint(0, 1141))
-
-    trainImg = Image.new('1', (Wimg, Himg), 1)
-    trainImg.paste(textImg, textLocation)
-
-    draw = ImageDraw.Draw(trainImg)
-    w, h = draw.textsize(code, font=arial)
-
-    #Top left and Bottom Right of rectangle
-    rectangleTL = (textLocation[0] + ((170 - w) / 2), textLocation[1] + ((170 - h) / 2))
-    rectangleBR = (rectangleTL[0] + w, rectangleTL[1] + h + 5)
-
-    # draw.rectangle((rectangleTL, rectangleBR))
-
-    jsonX = getImgJson(trainOrTest, trainImg, rectangleTL, rectangleBR, i, code)
-
-    if trainOrTest == "train":
-        trainImg.save(pathToTrainImgs + str(i) + code + trainOrTest + '.jpeg')
-        with codecs.open(pathToTrainAnns + str(i) + code + trainOrTest + '.json', 'w', 'utf8') as f:
-            string = json.dumps(jsonX, sort_keys=True, ensure_ascii=False)
-            f.write(string)
-
-    elif trainOrTest == "test":
-        trainImg.save(pathToTestImgs + str(i) + code + trainOrTest + '.jpeg')
-        with codecs.open(pathToTestAnns + str(i) + code + trainOrTest + '.json', 'w', 'utf8') as f:
-            string = json.dumps(jsonX, sort_keys=True, ensure_ascii=False)
-            f.write(string)
-
-    # print(json)
-    trainImg.show()
-    return trainImg
-
-
-
-def getMetaJson(testOrTrain):
-    json = {"tags_objects": ["text"],
-            "tags_images": ["codes"],
-            "classes": [
-                {
-                    "title": "text",
-                    "shape": "rectangle",
-                    "color": "#000000"
-                }
-            ]
-            }
-
-    return json
 
 
 def getImgJson(trainOrTest, img, TL, BR, i, code):
@@ -262,8 +190,8 @@ def getImgJson(trainOrTest, img, TL, BR, i, code):
                     "classTitle": "text",
                     "points": {
                         "exterior": [
-                            [TL[0], TL[1]],
-                            [BR[0], BR[1]]
+                            [TL[0], TL[1]], #Top Left Bounding Box coords
+                            [BR[0], BR[1]]  #Bottom Right Bounding Box coords
                         ],
                         "interior": []
                     }
@@ -273,7 +201,64 @@ def getImgJson(trainOrTest, img, TL, BR, i, code):
 
     return json
 
+def getMetaJson(testOrTrain):
+    json = {"tags_objects": ["text"],
+            "tags_images": ["codes"],
+            "classes": [
+                {
+                    "title": "text",
+                    "shape": "rectangle",
+                    "color": "#000000"
+                }
+            ]
+            }
 
+    return json
+
+def getTrainingImage(i, trainOrTest, textImg, code, dir='data'):
+
+    #Generate dirs if don't exist
+    pathToTrainImgs = os.path.join(dir, 'train/img/')
+    pathToTrainAnns = os.path.join(dir, 'train/ann/')
+    pathToTestImgs = os.path.join(dir, 'test/img/')
+    pathToTestAnns = os.path.join(dir, 'test/ann/')
+
+    arial = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 75)
+    Wimg, Himg = (2560, 1440)
+    textLocation = (random.randint(0, 2261), random.randint(0, 1141))
+
+    trainImg = Image.open('background.jpg')
+    trainImg.resize((Wimg, Himg))
+
+    trainImg.paste(textImg, textLocation, textImg)
+
+    draw = ImageDraw.Draw(trainImg)
+    w, h = draw.textsize(code, font=arial)
+
+    #Top left and Bottom Right of rectangle
+    rectangleTL = (textLocation[0] + ((170 - w) / 2), textLocation[1] + ((170 - h) / 2))
+    rectangleBR = (rectangleTL[0] + w, rectangleTL[1] + h + 5)
+
+    # draw.rectangle((rectangleTL, rectangleBR))
+
+    jsonX = getImgJson(trainOrTest, trainImg, rectangleTL, rectangleBR, i, code)
+
+    #Save all data
+    if trainOrTest == "train":
+        trainImg.save(pathToTrainImgs + str(i) + code + trainOrTest + '.jpeg')
+        with codecs.open(pathToTrainAnns + str(i) + code + trainOrTest + '.json', 'w', 'utf8') as f:
+            string = json.dumps(jsonX, sort_keys=True, ensure_ascii=False)
+            f.write(string)
+
+    elif trainOrTest == "test":
+        trainImg.save(pathToTestImgs + str(i) + code + trainOrTest + '.jpeg')
+        with codecs.open(pathToTestAnns + str(i) + code + trainOrTest + '.json', 'w', 'utf8') as f:
+            string = json.dumps(jsonX, sort_keys=True, ensure_ascii=False)
+            f.write(string)
+
+    return trainImg
+
+#Get all codes
 def getCodeList(file):
     charlist = []
     with open(file, 'r') as f:
@@ -283,8 +268,8 @@ def getCodeList(file):
     charlist = [x.strip("\n") for x in charlist]
     return charlist
 
-def genData(number, codesfile):
-    trainNumber = round(0.95 * number)
+def genData(number, codesfile, traintestsplit, outputdir):
+    trainNumber = round(traintestsplit * number)
     testNumber = number - trainNumber
 
     codesList = getCodeList(codesfile)
@@ -293,9 +278,20 @@ def genData(number, codesfile):
     testJson = getMetaJson('test')
     trainJson = getMetaJson('train')
 
-    pathToTest = 'data/'
+    #Generate Paths if it doesn't exist
+    pathToTrainImgs = os.path.join(outputdir, 'train/img/')
+    pathToTrainAnns = os.path.join(outputdir, 'train/ann/')
+    pathToTestImgs = os.path.join(outputdir, 'test/img/')
+    pathToTestAnns = os.path.join(outputdir, 'test/ann/')
 
-    with codecs.open(pathToTest + 'meta.json', 'w', 'utf8') as f:
+    pathTrainImgs = Path(pathToTrainImgs).mkdir(parents=True, exist_ok=True)
+    pathTrainAnns = Path(pathToTrainAnns).mkdir(parents=True, exist_ok=True)
+    pathTestImgs = Path(pathToTestImgs).mkdir(parents=True, exist_ok=True)
+    pathTestAnns = Path(pathToTestAnns).mkdir(parents=True, exist_ok=True)
+
+    pathData = outputdir + '/'
+
+    with codecs.open(pathData + 'meta.json', 'w', 'utf8') as f:
         string = json.dumps(testJson, sort_keys=True, ensure_ascii=False)
         f.write(string)
 
@@ -303,13 +299,13 @@ def genData(number, codesfile):
         if k < len(codesList):
             code = codesList[k]
             textImage = getTextImgForTraining(code, i)
-            getTrainingImage(i, "train", textImage, code)
+            getTrainingImage(i, "train", textImage, code, outputdir)
         else:
             randomIndex = random.randint(0, len(codesList))
             code = codesList[randomIndex]
 
             textImage = getTextImgForTraining(code, i)
-            getTrainingImage(i, "train", textImage, code)
+            getTrainingImage(i, "train", textImage, code, outputdir)
         k = k + 1
 
     for i in tqdm(range(testNumber)):
@@ -317,7 +313,23 @@ def genData(number, codesfile):
         code = codesList[randomIndex]
 
         textImage = getTextImgForTraining(code, i)
-        getTrainingImage(i, "test", textImage, code)
+        getTrainingImage(i, "test", textImage, code, outputdir)
 
-# genData(2, 'charsFixed2.txt')
+#Only run once, don't need
+def fixCharList(file, output_file):
+    onlyChars = []
+    i = 0
+
+    # Remove unicode codes, only want characters
+    with open(file, 'r') as f:
+        for line in f:
+            if i % 2 == 0:
+                onlyChars.append(line.strip("\n"))
+            i += 1
+
+    with open(output_file, 'w+') as f:
+        for line in onlyChars:
+            f.write(line)
+            f.write('\n')
+
 
