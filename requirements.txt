@@ -2,3 +2,6 @@ numpy
 tqdm
 Pillow
 pandas
+opencv-python
+scipy
+scikit-image
