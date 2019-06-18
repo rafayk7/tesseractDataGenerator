@@ -16,7 +16,7 @@ Generates the outputdir directory with the following tree structure:
 With images stored in their respective train (or test) /img folder and annotations in the train (or test) /ann folder. The meta.json file contains data for Supervisely. The annotations Json contains the text in the image, and the Top Left and Bottom Right co-ordinates of the bounding box. The text can be accessed by `json['objects'][0]['description']` and the points can be accessed by `json['objects'][0]['points']['exterior']`. 
 # How to use
 
-1. Clone the repo with `git clone https://github.com/rafayk7/korOCR.git`
+1. Clone the repo with `git clone https://github.com/rafayk7/tesseractDataGenerator.git`
 2. Download requirements with `pip install requirements.txt`
 3. Run run.py with `python3 run.py`
 
