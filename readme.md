@@ -1,6 +1,19 @@
 # Summary 
-Generates training data with JSON annotations for training Tesseract OCR on custom text characters/codes.
+Generates training data with JSON annotations for training Tesseract OCR on custom text characters/codes and is fully compatible with Supervisely.
 
+# Output
+Generates the outputdir directory with the following tree structure:
+```bash
+├── outputdir
+│   ├── train
+│   │   ├── img
+│   │   ├── ann
+│   ├── test
+│   │   ├── img
+│   │   ├── ann
+│   ├── meta.json
+```
+With images stored in their respective train (or test) /img folder and annotations in the train (or test) /ann folder. The meta.json file contains data for Supervisely. The annotations Json contains the text in the image, and the Top Left and Bottom Right co-ordinates of the bounding box. The text can be accessed by `json['objects'][0]['description']` and the points can be accessed by `json['objects'][0]['points']['exterior']`. 
 # How to use
 
 1. Clone the repo with `git clone https://github.com/rafayk7/korOCR.git`
