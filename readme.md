@@ -1,5 +1,9 @@
 # Summary 
-Generates training data with JSON annotations for training Tesseract OCR on custom text characters/codes and is fully compatible with Supervisely. COMING SOON: 1. GUI app to generate/edit box and tiff files for Tesseract 4.0.0 training (And one-click training as well at some point).
+Generates training data with JSON annotations for training Tesseract OCR on custom text characters/codes and is fully compatible with Supervisely. 
+
+# COMING SOON: 
+1. GUI app to generate/edit box and tiff files for Tesseract 4.0.0 training 
+2. One-click training as well at some point.
 
 # Output
 Generates the outputdir directory with the following tree structure:
