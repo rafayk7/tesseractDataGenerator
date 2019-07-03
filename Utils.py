@@ -138,14 +138,12 @@ def getTextImgForTraining(letter, number):
 
     w, h = draw.textsize(letter, font=arial)
 
-
-
     #Draw Red Text first in order to make background transparent
     draw.text(((W - w) / 2, (H - h) / 2), letter, font=arial, fill=(255,0,0,255))
 
     #Rotate the text to add more noise
-    randAngle = random.uniform(-20, 20)
-    newimg = newimg.rotate(randAngle, expand=1)
+    # randAngle = random.uniform(-20, 20)
+    # newimg = newimg.rotate(randAngle, expand=1)
 
     data = newimg.getdata()
     newData = []
@@ -174,8 +172,21 @@ def getTextImgForTraining(letter, number):
     return newimg
 
 
-def getImgJson(trainOrTest, img, TL, BR, i, code):
-    json = {"description": trainOrTest + " data",
+def getImgJson(trainOrTest, img, TL, BR, i, code, pageOrNo=False):
+    tesseractL = TL[0]
+    tesseractR = BR[0]
+    tesseractT = 1440 - TL[1]  # Transform this
+    tesseractB = 1440 - BR[1]  # Transform this
+    page = ''
+
+    if pageOrNo:
+        page = str(0)
+    else:
+        page = ''
+
+    json = {
+        "tesseract_cords": ("%s %d %d %d %d %s" % (code, tesseractL, tesseractB, tesseractR, tesseractT, page)),
+        "description": trainOrTest + " data",
             "name": str(i) + code + trainOrTest,
             "size": {
                 "width": 2560,
@@ -190,13 +201,14 @@ def getImgJson(trainOrTest, img, TL, BR, i, code):
                     "classTitle": "text",
                     "points": {
                         "exterior": [
-                            [TL[0], TL[1]], #Top Left Bounding Box coords
-                            [BR[0], BR[1]]  #Bottom Right Bounding Box coords
+                            [TL[0], TL[1]],  #Top Left Bounding Box coords
+                            [BR[0], BR[1]]   #Bottom Right Bounding Box coords
                         ],
                         "interior": []
                     }
                 }
-            ]
+            ],
+            "tesseract_cords": ("%s %d %d %d %d %s" % (code, tesseractL, tesseractB, tesseractR, tesseractT, page))
             }
 
     return json
@@ -225,6 +237,7 @@ def getTrainingImage(i, trainOrTest, textImg, code, dir='data'):
 
     arial = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 75)
     Wimg, Himg = (2560, 1440)
+
     textLocation = (random.randint(0, 2261), random.randint(0, 1141))
 
     trainImg = Image.open('background.jpg')
@@ -239,7 +252,7 @@ def getTrainingImage(i, trainOrTest, textImg, code, dir='data'):
     rectangleTL = (textLocation[0] + ((170 - w) / 2), textLocation[1] + ((170 - h) / 2))
     rectangleBR = (rectangleTL[0] + w, rectangleTL[1] + h + 5)
 
-    # draw.rectangle((rectangleTL, rectangleBR))
+    draw.rectangle((rectangleTL, rectangleBR))
 
     jsonX = getImgJson(trainOrTest, trainImg, rectangleTL, rectangleBR, i, code)
 
@@ -331,5 +344,3 @@ def fixCharList(file, output_file):
         for line in onlyChars:
             f.write(line)
             f.write('\n')
-
-
